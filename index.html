@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bank Statement Analyzer</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Inter,Segoe UI,Arial,sans-serif;background:#f5f7fb;color:#172033}
+    .app{display:flex;min-height:100vh}
+    .sidebar{width:240px;background:#111827;color:#fff;padding:26px 18px;position:fixed;inset:0 auto 0 0}
+    .brand{font-size:20px;font-weight:800;padding:0 12px 28px}
+    .brand span{color:#60a5fa}
+    .nav a{display:block;color:#aeb8c9;text-decoration:none;padding:12px 14px;border-radius:10px;margin:5px 0}
+    .nav a.active,.nav a:hover{background:#1f2937;color:#fff}
+    .main{margin-left:240px;width:calc(100% - 240px);padding:28px 34px}
+    .top{display:flex;justify-content:space-between;align-items:center;gap:20px;margin-bottom:24px}
+    h1{font-size:28px}.subtitle{color:#6b7280;margin-top:5px}
+    .upload{background:#fff;border:1px dashed #b8c2d1;border-radius:12px;padding:11px 15px;cursor:pointer}
+    .upload input{display:none}
+    .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:18px}
+    .card{background:#fff;border:1px solid #e8ebf0;border-radius:15px;padding:20px;box-shadow:0 5px 18px rgba(17,24,39,.04)}
+    .label{color:#6b7280;font-size:13px;font-weight:600}.value{font-size:27px;font-weight:800;margin:8px 0}.meta{font-size:12px;color:#8b95a5}
+    .green{color:#15966d}.red{color:#dc4b5d}.blue{color:#3b82f6}.purple{color:#7c3aed}
+    .grid{display:grid;grid-template-columns:1.35fr 1fr;gap:18px;margin-bottom:18px}
+    .panel{background:#fff;border:1px solid #e8ebf0;border-radius:15px;padding:20px;box-shadow:0 5px 18px rgba(17,24,39,.04)}
+    .panel h2{font-size:17px;margin-bottom:16px}
+    .chart-wrap{height:270px}
+    .summary{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .mini{background:#f8fafc;border-radius:11px;padding:14px}.mini b{display:block;font-size:18px;margin-top:6px}
+    .table-panel{padding:20px;background:#fff;border:1px solid #e8ebf0;border-radius:15px}
+    .table-head{display:flex;justify-content:space-between;align-items:center;gap:15px;margin-bottom:15px}
+    .filters{display:flex;gap:8px}
+    select,input[type=search]{border:1px solid #d8dee8;border-radius:8px;padding:9px 10px;background:#fff}
+    table{width:100%;border-collapse:collapse;font-size:14px}
+    th{text-align:left;color:#6b7280;font-size:12px;text-transform:uppercase;padding:12px;border-bottom:1px solid #e7ebf0}
+    td{padding:13px 12px;border-bottom:1px solid #eef1f5}
+    .badge{padding:5px 9px;border-radius:20px;font-size:11px;font-weight:700}.credit{background:#e8f8f1;color:#12805d}.debit{background:#fff0f2;color:#c9364d}
+    .empty{padding:30px;text-align:center;color:#7b8494}
+    .footer{text-align:center;color:#8a93a2;font-size:12px;margin-top:22px}
+    @media(max-width:1000px){.cards{grid-template-columns:repeat(2,1fr)}.grid{grid-template-columns:1fr}.sidebar{width:200px}.main{margin-left:200px;width:calc(100% - 200px)}}
+    @media(max-width:700px){.sidebar{display:none}.main{margin-left:0;width:100%;padding:20px}.top{align-items:flex-start;flex-direction:column}.cards{grid-template-columns:1fr}.summary{grid-template-columns:1fr}.table-panel{overflow:auto}table{min-width:700px}}
+  </style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">Bank<span>Analyzer</span></div>
+    <nav class="nav">
+      <a class="active" href="#">Dashboard</a>
+      <a href="#transactions">Transactions</a>
+      <a href="#analytics">Analytics</a>
+      <a href="#summary">Statement Summary</a>
+    </nav>
+  </aside>
+
+  <main class="main">
+    <div class="top">
+      <div>
+        <h1>Bank Statement Analyzer</h1>
+        <p class="subtitle">Clean financial summary of your bank statement</p>
+      </div>
+      <label class="upload">
+        <input id="fileInput" type="file" accept=".pdf,.csv,.txt" />
+        Upload PDF Statement
+      </label>
+    </div>
+
+    <section class="cards">
+      <div class="card"><div class="label">TOTAL SAVINGS</div><div class="value green" id="savings">₹0</div><div class="meta">Credit − Debit</div></div>
+      <div class="card"><div class="label">TOTAL CREDIT</div><div class="value blue" id="credit">₹0</div><div class="meta">Money received</div></div>
+      <div class="card"><div class="label">TOTAL DEBIT</div><div class="value red" id="debit">₹0</div><div class="meta">Money spent</div></div>
+      <div class="card"><div class="label">TRANSACTIONS</div><div class="value purple" id="count">0</div><div class="meta">Transactions analyzed</div></div>
+    </section>
+
+    <section class="grid" id="analytics">
+      <div class="panel">
+        <h2>Credit vs Debit</h2>
+        <div class="chart-wrap"><canvas id="incomeChart"></canvas></div>
+      </div>
+      <div class="panel" id="summary">
+        <h2>Statement Summary</h2>
+        <div class="summary">
+          <div class="mini"><span class="label">Opening Balance</span><b id="opening">₹0</b></div>
+          <div class="mini"><span class="label">Closing Balance</span><b id="closing">₹0</b></div>
+          <div class="mini"><span class="label">Largest Credit</span><b class="green" id="largestCredit">₹0</b></div>
+          <div class="mini"><span class="label">Largest Debit</span><b class="red" id="largestDebit">₹0</b></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" style="margin-bottom:18px">
+      <h2>Expense Categories</h2>
+      <div class="chart-wrap"><canvas id="categoryChart"></canvas></div>
+    </section>
+
+    <section class="table-panel" id="transactions">
+      <div class="table-head">
+        <h2>Recent Transactions</h2>
+        <div class="filters">
+          <input id="search" type="search" placeholder="Search..." />
+          <select id="typeFilter"><option value="all">All</option><option value="Credit">Credit</option><option value="Debit">Debit</option></select>
+        </div>
+      </div>
+      <div id="tableContainer"></div>
+    </section>
+
+    <div class="footer">Bank Statement Analyzer • Single-file HTML dashboard</div>
+  </main>
+</div>
+
+<script>
+const sample = [
+ {date:"2026-09-01",desc:"Salary Credit",type:"Credit",amount:60000,category:"Salary"},
+ {date:"2026-09-03",desc:"Grocery Store",type:"Debit",amount:4200,category:"Food"},
+ {date:"2026-09-05",desc:"Electricity Bill",type:"Debit",amount:2100,category:"Bills"},
+ {date:"2026-09-07",desc:"Freelance Payment",type:"Credit",amount:15000,category:"Income"},
+ {date:"2026-09-10",desc:"Online Shopping",type:"Debit",amount:3500,category:"Shopping"},
+ {date:"2026-09-12",desc:"Fuel",type:"Debit",amount:1800,category:"Transport"},
+ {date:"2026-09-15",desc:"Rent",type:"Debit",amount:12000,category:"Rent"},
+ {date:"2026-09-18",desc:"Restaurant",type:"Debit",amount:1600,category:"Food"},
+ {date:"2026-09-20",desc:"Cashback",type:"Credit",amount:750,category:"Other"},
+ {date:"2026-09-23",desc:"Movie & Entertainment",type:"Debit",amount:900,category:"Entertainment"}
+];
+
+let transactions = [...sample];
+let incomeChart, categoryChart;
+
+const money = n => "₹" + Number(n).toLocaleString("en-IN",{maximumFractionDigits:0});
+
+function render(){
+  const credits=transactions.filter(t=>t.type==="Credit").reduce((a,t)=>a+t.amount,0);
+  const debits=transactions.filter(t=>t.type==="Debit").reduce((a,t)=>a+t.amount,0);
+  const savings=credits-debits;
+  document.getElementById("credit").textContent=money(credits);
+  document.getElementById("debit").textContent=money(debits);
+  document.getElementById("savings").textContent=money(savings);
+  document.getElementById("count").textContent=transactions.length;
+
+  const opening=50000;
+  document.getElementById("opening").textContent=money(opening);
+  document.getElementById("closing").textContent=money(opening+savings);
+  document.getElementById("largestCredit").textContent=money(Math.max(0,...transactions.filter(t=>t.type==="Credit").map(t=>t.amount)));
+  document.getElementById("largestDebit").textContent=money(Math.max(0,...transactions.filter(t=>t.type==="Debit").map(t=>t.amount)));
+
+  drawCharts(credits,debits);
+  renderTable();
+}
+
+function drawCharts(credits,debits){
+  if(incomeChart) incomeChart.destroy();
+  incomeChart=new Chart(document.getElementById("incomeChart"),{
+    type:"bar",
+    data:{labels:["Credit","Debit","Savings"],datasets:[{label:"Amount",data:[credits,debits,credits-debits],borderRadius:8}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{callback:v=>"₹"+v.toLocaleString("en-IN")}}}}
+  });
+
+  const cats={};
+  transactions.filter(t=>t.type==="Debit").forEach(t=>cats[t.category]=(cats[t.category]||0)+t.amount);
+  if(categoryChart) categoryChart.destroy();
+  categoryChart=new Chart(document.getElementById("categoryChart"),{
+    type:"doughnut",
+    data:{labels:Object.keys(cats),datasets:[{data:Object.values(cats),borderWidth:2}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:"right"}}}
+  });
+}
+
+function renderTable(){
+  const search=document.getElementById("search").value.toLowerCase();
+  const filter=document.getElementById("typeFilter").value;
+  const rows=transactions.filter(t=>
+    (filter==="all"||t.type===filter) &&
+    (t.desc.toLowerCase().includes(search)||t.category.toLowerCase().includes(search))
+  );
+  if(!rows.length){document.getElementById("tableContainer").innerHTML='<div class="empty">No transactions found.</div>';return;}
+  document.getElementById("tableContainer").innerHTML=`<table>
+    <thead><tr><th>Date</th><th>Description</th><th>Category</th><th>Type</th><th>Amount</th></tr></thead>
+    <tbody>${rows.map(t=>`<tr><td>${t.date}</td><td>${t.desc}</td><td>${t.category}</td><td><span class="badge ${t.type==="Credit"?"credit":"debit"}">${t.type}</span></td><td>${t.type==="Credit"?"+":"−"}${money(t.amount)}</td></tr>`).join("")}</tbody>
+  </table>`;
+}
+
+document.getElementById("search").addEventListener("input",renderTable);
+document.getElementById("typeFilter").addEventListener("change",renderTable);
+
+document.getElementById("fileInput").addEventListener("change",async e=>{
+  const file=e.target.files[0]; if(!file)return;
+  const text=await file.text();
+  const lines=text.trim().split(/\r?\n/);
+  if(lines.length<2){alert("CSV file is empty.");return;}
+  const headers=lines[0].split(",").map(x=>x.trim().toLowerCase());
+  const idx=n=>headers.indexOf(n);
+  const dateI=idx("date"), descI=idx("description")>=0?idx("description"):idx("desc"), typeI=idx("type"), amountI=idx("amount"), catI=idx("category");
+  if(dateI<0||descI<0||typeI<0||amountI<0){alert("CSV headers must include: date, description, type, amount. category is optional.");return;}
+  transactions=lines.slice(1).map(line=>{
+    const p=line.split(",").map(x=>x.trim());
+    return {date:p[dateI],desc:p[descI],type:p[typeI].toLowerCase()==="credit"?"Credit":"Debit",amount:Math.abs(Number(p[amountI].replace(/[₹,]/g,""))||0),category:catI>=0&&p[catI]?p[catI]:"Other"};
+  }).filter(t=>t.date&&t.desc&&t.amount>=0);
+  render();
+});
+
+render();
+</script>
+</body>
+</html>
